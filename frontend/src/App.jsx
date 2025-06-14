@@ -379,10 +379,62 @@ function App() {
                     )}
                     <p><strong>Conclusión:</strong> {testResults.conclusion}</p>
                     {testResults.details.grouped_observed_counts && (
-                        <p>
-                            **Frecuencias Agrupadas Observadas:** {JSON.stringify(testResults.details.grouped_observed_counts)}<br/>
-                            **Frecuencias Agrupadas Esperadas:** {JSON.stringify(testResults.details.grouped_expected_counts)}
-                        </p>
+                      <section className="test-results-container">
+          <h2>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h2>
+          <p>
+            **Distribución Teórica Comparada:**{' '}
+            {testResults.distributionType === 'poisson' && `Poisson (λ=${lambda})`}
+            {testResults.distributionType === 'normal' && `Normal (μ=${mean}, σ=${stdDev})`}
+          </p>
+          {testResults.statistic !== null && (
+            <p>
+              **Estadístico de Prueba:** {testResults.statistic}
+            </p>
+          )}
+          {testResults.pValue !== null && (
+            <p>
+              **P-valor:** {testResults.pValue}
+            </p>
+          )}
+
+          {/* ESTA ES LA SECCIÓN NUEVA/MODIFICADA PARA LA TABLA */}
+          {testResults.details && testResults.details.grouped_observed_counts && testResults.details.grouped_expected_counts && (
+            <div className="frequency-table-container">
+              <h3>Frecuencias Agrupadas para la Prueba Chi-cuadrado:</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Grupo/Categoría</th>
+                    <th>Frecuencias Observadas</th>
+                    <th>Frecuencias Esperadas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {testResults.details.grouped_observed_counts.map((obs, index) => (
+                    <tr key={index}>
+                      <td>{index + 1}</td> {/* Si quieres, podrías hacer un rango aquí, pero para simplicidad, se usa el índice. */}
+                      <td>{obs.toFixed(2)}</td>
+                      <td>{testResults.details.grouped_expected_counts[index].toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {testResults.details.degrees_of_freedom !== undefined && (
+                <p className="small-text">
+                  Grados de Libertad (df): {testResults.details.degrees_of_freedom}
+                </p>
+              )}
+              <p className="small-text">
+                Nota: Las frecuencias esperadas menores a 5 se agrupan para la validez de la prueba Chi-cuadrado, siguiendo el criterio de Cochran.
+              </p>
+            </div>
+          )}
+          {/* FIN DE LA SECCIÓN MODIFICADA */}
+
+          <p>
+            **Conclusión:** {testResults.conclusion}
+          </p>
+        </section>
                     )}
                 </div>
             )}
