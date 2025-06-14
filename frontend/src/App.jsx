@@ -31,116 +31,105 @@ function App() {
   const [stdDev, setStdDev] = useState(1);  // Valor predeterminado para Normal
   const [chartData, setChartData] = useState({});
   const [chartOptions, setChartOptions] = useState({});
-  // AÑADE ESTA LÍNEA para gestionar el tipo de gráfico como estado
   const [currentChartComponent, setCurrentChartComponent] = useState(Bar);
+  const [loading, setLoading] = useState(false); // Nuevo estado para indicar carga
+  const [error, setError] = useState(null);       // Nuevo estado para errores
 
 
-  // Función para calcular la PMF de Poisson (probabilidad puntual)
-  const calculatePoissonPMF = (k, lambdaVal) => {
-    if (k < 0 || !Number.isInteger(k)) return 0;
-    return (Math.exp(-lambdaVal) * Math.pow(lambdaVal, k)) / factorial(k);
-  };
 
-  // Función para calcular la PDF de la Normal (densidad de probabilidad)
-  const calculateNormalPDF = (x, meanVal, stdDevVal) => {
-    const exponent = -Math.pow(x - meanVal, 2) / (2 * Math.pow(stdDevVal, 2));
-    const factor = 1 / (stdDevVal * Math.sqrt(2 * Math.PI));
-    return factor * Math.exp(exponent);
-  };
+  const generateChartData = async () => { // Hacemos la función asíncrona para usar await
+    setLoading(true); // Indicar que la carga ha comenzado
+    setError(null);   // Limpiar errores previos
 
-  // Función auxiliar para calcular el factorial
-  const factorial = (n) => {
-    if (n === 0 || n === 1) return 1;
-    let result = 1;
-    for (let i = 2; i <= n; i++) {
-      result *= i;
-    }
-    return result;
-  };
-
-  const generateChartData = () => {
-    let labels = [];
-    let data = [];
-    let titleText = '';
-    // MODIFICA ESTA LÍNEA para actualizar el estado del componente de gráfico
-    setCurrentChartComponent(distributionType === 'poisson' ? Bar : Line);
-
+    let requestBody = { distributionType: distributionType };
     if (distributionType === 'poisson') {
-      titleText = `Distribución de Poisson (λ = ${lambda})`;
-      // Generar k desde 0 hasta un valor razonable (ej. lambda * 3 o 15)
-      const maxK = Math.max(15, Math.ceil(lambda * 3));
-      for (let k = 0; k <= maxK; k++) {
-        labels.push(k.toString());
-        data.push(calculatePoissonPMF(k, lambda));
-      }
+      requestBody.lambda = lambda;
     } else { // Normal
-      titleText = `Distribución Normal (μ = ${mean}, σ = ${stdDev})`;
-      // Generar puntos para la curva normal (ej. +/- 4 desviaciones estándar)
-      const minX = mean - 4 * stdDev;
-      const maxX = mean + 4 * stdDev;
-      const step = (maxX - minX) / 100; // 100 puntos para una curva suave
-
-      for (let i = 0; i <= 100; i++) {
-        const x = minX + i * step;
-        labels.push(x.toFixed(2));
-        data.push(calculateNormalPDF(x, mean, stdDev));
-      }
+      requestBody.mean = mean;
+      requestBody.stdDev = stdDev;
     }
 
-    setChartData({
-      labels: labels,
-      datasets: [
-        {
-          label: 'Probabilidad',
-          data: data,
-          backgroundColor: distributionType === 'poisson' ? 'rgba(75, 192, 192, 0.6)' : 'rgba(153, 102, 255, 0.6)',
-          borderColor: distributionType === 'poisson' ? 'rgba(75, 192, 192, 1)' : 'rgba(153, 102, 255, 1)',
-          borderWidth: 1,
-          pointRadius: distributionType === 'poisson' ? 5 : 0, // Puntos solo para Poisson
+    try {
+      const response = await fetch('/api/generate_distribution_data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ],
-    });
+        body: JSON.stringify(requestBody),
+      });
 
-    setChartOptions({
-      responsive: true,
-      plugins: {
-        legend: {
-          position: 'top',
-        },
-        title: {
-          display: true,
-          text: titleText,
-        },
-      },
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: distributionType === 'poisson' ? 'Número de Eventos (k)' : 'Valor (x)',
-          },
-        },
-        y: {
-          title: {
-            display: true,
-            text: 'Probabilidad / Densidad',
-          },
-          beginAtZero: true,
-        },
-      },
-      animation: {
-        duration: 0 // Desactiva la animación para actualizaciones más rápidas
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al obtener datos de distribución.');
       }
-    });
+
+      const data = await response.json(); // La respuesta del backend
+
+      setCurrentChartComponent(distributionType === 'poisson' ? Bar : Line);
+      
+      const titleText = distributionType === 'poisson' 
+        ? `Distribución de Poisson (λ = ${lambda})`
+        : `Distribución Normal (μ = ${mean}, σ = ${stdDev})`;
+
+      setChartData({
+        labels: data.labels, // Usamos los labels y data del backend
+        datasets: [
+          {
+            label: 'Probabilidad',
+            data: data.data,
+            backgroundColor: distributionType === 'poisson' ? 'rgba(75, 192, 192, 0.6)' : 'rgba(153, 102, 255, 0.6)',
+            borderColor: distributionType === 'poisson' ? 'rgba(75, 192, 192, 1)' : 'rgba(153, 102, 255, 1)',
+            borderWidth: 1,
+            pointRadius: distributionType === 'poisson' ? 5 : 0,
+            fill: false, // Para la línea normal, evita que se rellene debajo
+          },
+        ],
+      });
+
+      setChartOptions({
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          title: {
+            display: true,
+            text: titleText,
+          },
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: distributionType === 'poisson' ? 'Número de Eventos (k)' : 'Valor (x)',
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Probabilidad / Densidad',
+            },
+            beginAtZero: true,
+          },
+        },
+        animation: {
+          duration: 0
+        }
+      });
+
+    } catch (err) {
+      console.error("Error al generar datos de gráfico:", err);
+      setError(err.message); // Mostrar el mensaje de error en la UI
+      setChartData({}); // Limpiar el gráfico en caso de error
+    } finally {
+      setLoading(false); // La carga ha terminado
+    }
   };
 
-  // Generar la gráfica al cargar el componente y cuando cambian los parámetros
   useEffect(() => {
     generateChartData();
-  }, [distributionType, lambda, mean, stdDev]); // Dependencias del useEffect
+  }, [distributionType, lambda, mean, stdDev]);
 
-  // Renderizado del componente
-  const ChartComponent = currentChartComponent; // Asigna el componente de gráfico a una variable
-  
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Modelado y Simulación de Deserción Estudiantil</h1>
@@ -196,15 +185,16 @@ function App() {
           </div>
         )}
         
+        {loading && <p>Cargando datos de la distribución...</p>}
+        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+        
         <div style={{ width: '70%', margin: '20px auto' }}>
-          {/* Usa la variable de estado 'currentChartComponent' */}
-          {chartData.datasets && ChartComponent && (
-            <ChartComponent data={chartData} options={chartOptions} />
+          {chartData.datasets && chartData.datasets[0] && chartData.datasets[0].data.length > 0 && (
+            React.createElement(currentChartComponent, { data: chartData, options: chartOptions })
           )}
         </div>
       </section>
 
-      {/* Aquí irá la sección de análisis de datos reales en fases futuras */}
       <section style={{ marginTop: '40px' }}>
         <h2>Análisis de Datos de Abandono Reales (Próximamente)</h2>
         <p>Esta sección permitirá ingresar datos de abandono y realizar pruebas de bondad de ajuste.</p>
