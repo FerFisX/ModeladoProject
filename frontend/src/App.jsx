@@ -12,7 +12,6 @@ import {
   Legend,
 } from 'chart.js';
 
-// Registrar los componentes necesarios de Chart.js
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -36,13 +35,18 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- NUEVOS Estados para la sección de datos de abandono reales ---
-  // Inicializamos con los datos que me proporcionaste como ejemplo
+  // --- Estados para la sección de datos de abandono reales ---
   const [observedAbandonmentData, setObservedAbandonmentData] = useState(
     [345, 310, 232, 108, 49, 13, 6, 1, 0, 0]
   );
   const [observedChartData, setObservedChartData] = useState({});
   const [observedChartOptions, setObservedChartOptions] = useState({});
+
+  // --- NUEVOS Estados para las pruebas de bondad de ajuste ---
+  const [testType, setTestType] = useState('chi_square'); // 'chi_square' o 'kolmogorov_smirnov'
+  const [testResults, setTestResults] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState(null);
 
 
   // Función para obtener datos de distribución del backend
@@ -135,7 +139,6 @@ function App() {
     }
   };
 
-  // --- NUEVA Función para generar la gráfica de datos de abandono observados ---
   const generateObservedChart = () => {
     const labels = Array.from({ length: 10 }, (_, i) => `${i + 1}º Semestre`);
     
@@ -184,23 +187,65 @@ function App() {
     });
   };
 
-
-  // --- NUEVA Función para manejar cambios en los inputs de abandono ---
   const handleObservedDataChange = (index, value) => {
     const newObservedData = [...observedAbandonmentData];
-    newObservedData[index] = Number(value); // Asegurarse de que sea un número
+    newObservedData[index] = Number(value);
     setObservedAbandonmentData(newObservedData);
   };
 
-  // useEffects para actualizar gráficas automáticamente
+  // --- NUEVA Función para ejecutar la prueba de bondad de ajuste ---
+  const runGoodnessOfFitTest = async () => {
+    setTestLoading(true);
+    setTestError(null);
+    setTestResults(null); // Limpiar resultados anteriores
+
+    let requestBody = {
+      testType: testType,
+      observedData: observedAbandonmentData,
+      distributionType: distributionType, // Usamos el tipo de distribución seleccionado en la primera sección
+    };
+
+    // Añadir parámetros de la distribución teórica según el tipo seleccionado
+    if (distributionType === 'poisson') {
+      requestBody.lambda = lambda;
+    } else { // Normal
+      requestBody.mean = mean;
+      requestBody.stdDev = stdDev;
+    }
+
+    try {
+      const response = await fetch('/api/run_goodness_of_fit_test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al ejecutar la prueba.');
+      }
+
+      const results = await response.json();
+      setTestResults(results);
+
+    } catch (err) {
+      console.error("Error al ejecutar la prueba:", err);
+      setTestError(err.message);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+
   useEffect(() => {
     generateChartData();
   }, [distributionType, lambda, mean, stdDev]);
 
   useEffect(() => {
     generateObservedChart();
-  }, [observedAbandonmentData]); // Se actualiza cada vez que cambian los datos observados
-
+  }, [observedAbandonmentData]);
 
   // Renderizado del componente
   const ChartComponent = currentChartComponent;
@@ -292,21 +337,90 @@ function App() {
           ))}
         </div>
         
-        {/* El botón de "Graficar" ya no es estrictamente necesario si usamos useEffect, pero podemos mantenerlo si queremos un control manual */}
-        {/* <button onClick={generateObservedChart} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '16px' }}>
-          Graficar Datos de Abandono
-        </button> */}
-
         <div style={{ width: '70%', margin: '20px auto' }}>
           {observedChartData.datasets && observedChartData.datasets[0] && observedChartData.datasets[0].data.length > 0 && (
             <Bar data={observedChartData} options={observedChartOptions} />
           )}
         </div>
 
-        {/* Aquí irán las opciones de prueba de bondad de ajuste en la siguiente fase */}
-        <div style={{ marginTop: '20px' }}>
-            <h3>Pruebas de Bondad de Ajuste (Próximamente)</h3>
-            <p>Selecciona una prueba para determinar si tus datos de abandono se ajustan a una distribución teórica.</p>
+        {/* Sección de Pruebas de Bondad de Ajuste */}
+        <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+            <h3>Pruebas de Bondad de Ajuste</h3>
+            <p>Selecciona una prueba para determinar si tus datos de abandono se ajustan a la distribución teórica seleccionada en la sección superior.</p>
+            <div>
+                <label>
+                    Tipo de Prueba:
+                    <select value={testType} onChange={(e) => setTestType(e.target.value)}>
+                        <option value="chi_square">Chi-cuadrado ($\chi^2$)</option>
+                        <option value="kolmogorov_smirnov">Kolmogorov-Smirnov (K-S)</option>
+                    </select>
+                </label>
+                <button 
+                  onClick={runGoodnessOfFitTest} 
+                  disabled={testLoading}
+                  style={{ marginLeft: '15px', padding: '10px 20px', fontSize: '16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                >
+                  {testLoading ? 'Ejecutando...' : 'Ejecutar Prueba'}
+                </button>
+            </div>
+
+            {testLoading && <p style={{ marginTop: '15px' }}>Calculando la prueba...</p>}
+            {testError && <p style={{ color: 'red', marginTop: '15px' }}>Error en la prueba: {testError}</p>}
+
+            {testResults && !testLoading && !testError && (
+                <div style={{ marginTop: '20px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                    <h4>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h4>
+                    <p><strong>Distribución Teórica Comparada:</strong> {testResults.distributionType === 'poisson' ? `Poisson (λ=${lambda})` : `Normal (μ=${mean}, σ=${stdDev})`}</p>
+                    <p><strong>Estadístico de Prueba:</strong> {testResults.statistic}</p>
+                    <p><strong>P-valor:</strong> {testResults.pValue}</p>
+                    {testResults.details.degrees_of_freedom !== undefined && (
+                        <p><strong>Grados de Libertad:</strong> {testResults.details.degrees_of_freedom}</p>
+                    )}
+                    <p><strong>Conclusión:</strong> {testResults.conclusion}</p>
+                    {testResults.details.grouped_observed_counts && (
+                        <p>
+                            **Frecuencias Agrupadas Observadas:** {JSON.stringify(testResults.details.grouped_observed_counts)}<br/>
+                            **Frecuencias Agrupadas Esperadas:** {JSON.stringify(testResults.details.grouped_expected_counts)}
+                        </p>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {/* Sección de Conclusiones y Recomendaciones */}
+        <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+            <h2>Conclusiones y Recomendaciones</h2>
+            {testResults ? (
+                <div>
+                    {testResults.conclusion.includes("NO se ajustan") ? (
+                        <>
+                            <p><strong>Los datos observados de abandono NO se ajustan a la distribución {testResults.distributionType.capitalize()} con los parámetros seleccionados.</strong> Esto sugiere que la forma en que los estudiantes abandonan no sigue este patrón estadístico específico.</p>
+                            <h3>Posibles Razones y Recomendaciones:</h3>
+                            <ul>
+                                <li>**Exploración de otros factores:** Investiga otros factores que podrían influir en el abandono, como el rendimiento académico, situación socioeconómica, apoyo psicológico, calidad de la enseñanza, o eventos externos (pandemias, crisis económicas).</li>
+                                <li>**Prueba con diferentes distribuciones:** Intenta ajustar los datos a otras distribuciones de probabilidad (ej. Binomial Negativa si hay "sobre-dispersión" en los conteos, o una Normal con diferentes parámetros) para ver si alguna se ajusta mejor.</li>
+                                <li>**Análisis de Segmentos:** Divide a los estudiantes por cohortes (ej. por año de ingreso, por programa de estudio) y analiza el abandono para cada segmento. Los patrones podrían variar.</li>
+                                <li>**Modelos Predictivos:** Considera el uso de modelos de Machine Learning (ej. regresión logística, árboles de decisión) que puedan identificar a los estudiantes en riesgo de abandono basándose en múltiples variables.</li>
+                                <li>**Recopilación de Datos Adicionales:** Si es posible, recolecta datos más detallados sobre las razones del abandono directamente de los estudiantes (encuestas de salida, entrevistas).</li>
+                            </ul>
+                        </>
+                    ) : (
+                        <>
+                            <p><strong>Los datos observados de abandono PUEDEN ajustarse a la distribución {testResults.distributionType.capitalize()} con los parámetros seleccionados.</strong> Esto implica que el patrón de abandono podría estar influenciado por un proceso aleatorio consistente con esta distribución. Por ejemplo, en Poisson, esto podría indicar que la tasa promedio de abandono ($\lambda$) es relativamente constante por semestre.</p>
+                            <h3>Posibles Acciones y Recomendaciones:</h3>
+                            <ul>
+                                <li>**Validación del Modelo:** Aunque la prueba no rechazó la hipótesis nula, esto no prueba que los datos *definitivamente* sigan esa distribución. Es una buena indicación, pero siempre es útil validar con más datos o con otros métodos.</li>
+                                <li>**Comprensión de los Parámetros:** Si se ajusta a Poisson, el $\lambda$ (media de eventos por semestre) es un indicador clave. Si se ajusta a Normal, la media y desviación estándar describen el pico y la dispersión del abandono. Usa estos parámetros para entender mejor el fenómeno.</li>
+                                <li>**Identificación de Semestres Críticos:** Observa dónde se concentra la mayor probabilidad de abandono según la distribución teórica. Por ejemplo, con $\lambda=2$ en Poisson, los semestres 1 y 2 son críticos.</li>
+                                <li>**Intervenciones Dirigidas:** Diseña programas de apoyo dirigidos a los semestres o períodos donde la distribución predice un mayor abandono. Esto podría incluir tutorías, apoyo financiero, asesoramiento académico o psicológico.</li>
+                                <li>**Monitoreo Continuo:** Sigue monitoreando los datos de abandono para ver si el patrón se mantiene con el tiempo y si las intervenciones tienen un impacto.</li>
+                            </ul>
+                        </>
+                    )}
+                </div>
+            ) : (
+                <p>Ejecuta una prueba de bondad de ajuste para ver conclusiones y recomendaciones.</p>
+            )}
         </div>
       </section>
     </div>
