@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
+import './App.css';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -42,7 +43,7 @@ function App() {
   const [observedChartData, setObservedChartData] = useState({});
   const [observedChartOptions, setObservedChartOptions] = useState({});
 
-  // --- NUEVOS Estados para las pruebas de bondad de ajuste ---
+  // --- Estados para las pruebas de bondad de ajuste ---
   const [testType, setTestType] = useState('chi_square'); // 'chi_square' o 'kolmogorov_smirnov'
   const [testResults, setTestResults] = useState(null);
   const [testLoading, setTestLoading] = useState(false);
@@ -193,7 +194,6 @@ function App() {
     setObservedAbandonmentData(newObservedData);
   };
 
-  // --- NUEVA Función para ejecutar la prueba de bondad de ajuste ---
   const runGoodnessOfFitTest = async () => {
     setTestLoading(true);
     setTestError(null);
@@ -370,7 +370,8 @@ function App() {
             {testResults && !testLoading && !testError && (
                 <div style={{ marginTop: '20px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
                     <h4>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h4>
-                    <p><strong>Distribución Teórica Comparada:</strong> {testResults.distributionType === 'poisson' ? `Poisson (λ=${lambda})` : `Normal (μ=${mean}, σ=${stdDev})`}</p>
+                    {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
+                    <p><strong>Distribución Teórica Comparada:</strong> {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} ({testResults.distributionType === 'poisson' ? `λ=${lambda}` : `μ=${mean}, σ=${stdDev}`})</p>
                     <p><strong>Estadístico de Prueba:</strong> {testResults.statistic}</p>
                     <p><strong>P-valor:</strong> {testResults.pValue}</p>
                     {testResults.details.degrees_of_freedom !== undefined && (
@@ -394,7 +395,8 @@ function App() {
                 <div>
                     {testResults.conclusion.includes("NO se ajustan") ? (
                         <>
-                            <p><strong>Los datos observados de abandono NO se ajustan a la distribución {testResults.distributionType.capitalize()} con los parámetros seleccionados.</strong> Esto sugiere que la forma en que los estudiantes abandonan no sigue este patrón estadístico específico.</p>
+                            {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
+                            <p><strong>Los datos observados de abandono NO se ajustan a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto sugiere que la forma en que los estudiantes abandonan no sigue este patrón estadístico específico.</p>
                             <h3>Posibles Razones y Recomendaciones:</h3>
                             <ul>
                                 <li>**Exploración de otros factores:** Investiga otros factores que podrían influir en el abandono, como el rendimiento académico, situación socioeconómica, apoyo psicológico, calidad de la enseñanza, o eventos externos (pandemias, crisis económicas).</li>
@@ -406,7 +408,8 @@ function App() {
                         </>
                     ) : (
                         <>
-                            <p><strong>Los datos observados de abandono PUEDEN ajustarse a la distribución {testResults.distributionType.capitalize()} con los parámetros seleccionados.</strong> Esto implica que el patrón de abandono podría estar influenciado por un proceso aleatorio consistente con esta distribución. Por ejemplo, en Poisson, esto podría indicar que la tasa promedio de abandono ($\lambda$) es relativamente constante por semestre.</p>
+                            {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
+                            <p><strong>Los datos observados de abandono PUEDEN ajustarse a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto implica que el patrón de abandono podría estar influenciado por un proceso aleatorio consistente con esta distribución. Por ejemplo, en Poisson, esto podría indicar que la tasa promedio de abandono ($\lambda$) es relativamente constante por semestre.</p>
                             <h3>Posibles Acciones y Recomendaciones:</h3>
                             <ul>
                                 <li>**Validación del Modelo:** Aunque la prueba no rechazó la hipótesis nula, esto no prueba que los datos *definitivamente* sigan esa distribución. Es una buena indicación, pero siempre es útil validar con más datos o con otros métodos.</li>
