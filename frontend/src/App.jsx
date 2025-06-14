@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -25,21 +25,30 @@ ChartJS.register(
 );
 
 function App() {
+  // --- Estado para la sección de distribuciones teóricas ---
   const [distributionType, setDistributionType] = useState('poisson');
-  const [lambda, setLambda] = useState(2); // Valor predeterminado para Poisson
-  const [mean, setMean] = useState(0);     // Valor predeterminado para Normal
-  const [stdDev, setStdDev] = useState(1);  // Valor predeterminado para Normal
+  const [lambda, setLambda] = useState(2);
+  const [mean, setMean] = useState(0);
+  const [stdDev, setStdDev] = useState(1);
   const [chartData, setChartData] = useState({});
   const [chartOptions, setChartOptions] = useState({});
   const [currentChartComponent, setCurrentChartComponent] = useState(Bar);
-  const [loading, setLoading] = useState(false); // Nuevo estado para indicar carga
-  const [error, setError] = useState(null);       // Nuevo estado para errores
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // --- NUEVOS Estados para la sección de datos de abandono reales ---
+  // Inicializamos con los datos que me proporcionaste como ejemplo
+  const [observedAbandonmentData, setObservedAbandonmentData] = useState(
+    [345, 310, 232, 108, 49, 13, 6, 1, 0, 0]
+  );
+  const [observedChartData, setObservedChartData] = useState({});
+  const [observedChartOptions, setObservedChartOptions] = useState({});
 
 
-
-  const generateChartData = async () => { // Hacemos la función asíncrona para usar await
-    setLoading(true); // Indicar que la carga ha comenzado
-    setError(null);   // Limpiar errores previos
+  // Función para obtener datos de distribución del backend
+  const generateChartData = async () => {
+    setLoading(true);
+    setError(null);
 
     let requestBody = { distributionType: distributionType };
     if (distributionType === 'poisson') {
@@ -63,7 +72,7 @@ function App() {
         throw new Error(errorData.error || 'Error al obtener datos de distribución.');
       }
 
-      const data = await response.json(); // La respuesta del backend
+      const data = await response.json();
 
       setCurrentChartComponent(distributionType === 'poisson' ? Bar : Line);
       
@@ -72,7 +81,7 @@ function App() {
         : `Distribución Normal (μ = ${mean}, σ = ${stdDev})`;
 
       setChartData({
-        labels: data.labels, // Usamos los labels y data del backend
+        labels: data.labels,
         datasets: [
           {
             label: 'Probabilidad',
@@ -81,7 +90,7 @@ function App() {
             borderColor: distributionType === 'poisson' ? 'rgba(75, 192, 192, 1)' : 'rgba(153, 102, 255, 1)',
             borderWidth: 1,
             pointRadius: distributionType === 'poisson' ? 5 : 0,
-            fill: false, // Para la línea normal, evita que se rellene debajo
+            fill: false,
           },
         ],
       });
@@ -119,22 +128,89 @@ function App() {
 
     } catch (err) {
       console.error("Error al generar datos de gráfico:", err);
-      setError(err.message); // Mostrar el mensaje de error en la UI
-      setChartData({}); // Limpiar el gráfico en caso de error
+      setError(err.message);
+      setChartData({});
     } finally {
-      setLoading(false); // La carga ha terminado
+      setLoading(false);
     }
   };
 
+  // --- NUEVA Función para generar la gráfica de datos de abandono observados ---
+  const generateObservedChart = () => {
+    const labels = Array.from({ length: 10 }, (_, i) => `${i + 1}º Semestre`);
+    
+    setObservedChartData({
+      labels: labels,
+      datasets: [
+        {
+          label: 'Estudiantes que Abandonaron',
+          data: observedAbandonmentData,
+          backgroundColor: 'rgba(255, 99, 132, 0.6)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+        },
+      ],
+    });
+
+    setObservedChartOptions({
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: 'Cantidad de Estudiantes que Abandonaron por Semestre (Datos Ingresados)',
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Nivel de Semestre',
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Cantidad de Estudiantes',
+          },
+          beginAtZero: true,
+        },
+      },
+      animation: {
+        duration: 0
+      }
+    });
+  };
+
+
+  // --- NUEVA Función para manejar cambios en los inputs de abandono ---
+  const handleObservedDataChange = (index, value) => {
+    const newObservedData = [...observedAbandonmentData];
+    newObservedData[index] = Number(value); // Asegurarse de que sea un número
+    setObservedAbandonmentData(newObservedData);
+  };
+
+  // useEffects para actualizar gráficas automáticamente
   useEffect(() => {
     generateChartData();
   }, [distributionType, lambda, mean, stdDev]);
 
+  useEffect(() => {
+    generateObservedChart();
+  }, [observedAbandonmentData]); // Se actualiza cada vez que cambian los datos observados
+
+
+  // Renderizado del componente
+  const ChartComponent = currentChartComponent;
+  
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Modelado y Simulación de Deserción Estudiantil</h1>
 
-      <section>
+      {/* Sección 1: Generación y Visualización de Distribuciones Teóricas */}
+      <section style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
         <h2>Generación y Visualización de Distribuciones Teóricas</h2>
         <div>
           <label>
@@ -195,9 +271,43 @@ function App() {
         </div>
       </section>
 
-      <section style={{ marginTop: '40px' }}>
-        <h2>Análisis de Datos de Abandono Reales (Próximamente)</h2>
-        <p>Esta sección permitirá ingresar datos de abandono y realizar pruebas de bondad de ajuste.</p>
+      {/* Sección 2: Análisis de Datos de Abandono Reales */}
+      <section style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+        <h2>Análisis de Datos de Abandono por Semestre (Datos Observados)</h2>
+        <p>Introduce la cantidad de estudiantes que abandonaron por cada semestre (del 1º al 10º).</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', maxWidth: '800px', margin: '0 auto' }}>
+          {observedAbandonmentData.map((count, index) => (
+            <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <label>
+                {index + 1}º Semestre:
+                <input
+                  type="number"
+                  value={count}
+                  onChange={(e) => handleObservedDataChange(index, e.target.value)}
+                  min="0"
+                  style={{ width: '80px', textAlign: 'center' }}
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+        
+        {/* El botón de "Graficar" ya no es estrictamente necesario si usamos useEffect, pero podemos mantenerlo si queremos un control manual */}
+        {/* <button onClick={generateObservedChart} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '16px' }}>
+          Graficar Datos de Abandono
+        </button> */}
+
+        <div style={{ width: '70%', margin: '20px auto' }}>
+          {observedChartData.datasets && observedChartData.datasets[0] && observedChartData.datasets[0].data.length > 0 && (
+            <Bar data={observedChartData} options={observedChartOptions} />
+          )}
+        </div>
+
+        {/* Aquí irán las opciones de prueba de bondad de ajuste en la siguiente fase */}
+        <div style={{ marginTop: '20px' }}>
+            <h3>Pruebas de Bondad de Ajuste (Próximamente)</h3>
+            <p>Selecciona una prueba para determinar si tus datos de abandono se ajustan a una distribución teórica.</p>
+        </div>
       </section>
     </div>
   );
