@@ -80,8 +80,8 @@ function App() {
       const data = await response.json();
 
       setCurrentChartComponent(distributionType === 'poisson' ? Bar : Line);
-      
-      const titleText = distributionType === 'poisson' 
+
+      const titleText = distributionType === 'poisson'
         ? `Distribución de Poisson (λ = ${lambda})`
         : `Distribución Normal (μ = ${mean}, σ = ${stdDev})`;
 
@@ -142,7 +142,7 @@ function App() {
 
   const generateObservedChart = () => {
     const labels = Array.from({ length: 10 }, (_, i) => `${i + 1}º Semestre`);
-    
+
     setObservedChartData({
       labels: labels,
       datasets: [
@@ -249,18 +249,25 @@ function App() {
 
   // Renderizado del componente
   const ChartComponent = currentChartComponent;
-  
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Modelado y Simulación de Deserción Estudiantil</h1>
+    <div className="app-container"> {/* Contenedor principal para centrar y aplicar estilos */}
+      <header className="app-header">
+        <h1>Modelado y Simulación de Deserción Estudiantil</h1>
+      </header>
 
       {/* Sección 1: Generación y Visualización de Distribuciones Teóricas */}
-      <section style={{ marginBottom: '40px', border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+      <section className="card-section">
         <h2>Generación y Visualización de Distribuciones Teóricas</h2>
-        <div>
-          <label>
+        <div className="input-group">
+          <label htmlFor="distribution-select">
             Selecciona Distribución:
-            <select value={distributionType} onChange={(e) => setDistributionType(e.target.value)}>
+            <select
+              id="distribution-select"
+              value={distributionType}
+              onChange={(e) => setDistributionType(e.target.value)}
+              className="styled-select"
+            >
               <option value="poisson">Poisson</option>
               <option value="normal">Normal</option>
             </select>
@@ -268,48 +275,54 @@ function App() {
         </div>
 
         {distributionType === 'poisson' && (
-          <div style={{ marginTop: '10px' }}>
-            <label>
-              Lambda (λ):
+          <div className="input-group">
+            <label htmlFor="lambda-input">
+              Lambda (<strong className="math-symbol">λ</strong>):
               <input
                 type="number"
+                id="lambda-input"
                 value={lambda}
                 onChange={(e) => setLambda(Number(e.target.value))}
                 min="0.1"
                 step="0.1"
+                className="styled-input"
               />
             </label>
           </div>
         )}
 
         {distributionType === 'normal' && (
-          <div style={{ marginTop: '10px' }}>
-            <label>
-              Media (μ):
+          <div className="input-group-row"> {/* Usar una clase para inputs en fila */}
+            <label htmlFor="mean-input">
+              Media (<strong className="math-symbol">μ</strong>):
               <input
                 type="number"
+                id="mean-input"
                 value={mean}
                 onChange={(e) => setMean(Number(e.target.value))}
                 step="0.1"
+                className="styled-input"
               />
             </label>
-            <label style={{ marginLeft: '10px' }}>
-              Desviación Estándar (σ):
+            <label htmlFor="stddev-input" className="ml-15"> {/* Clase para margen izquierdo */}
+              Desviación Estándar (<strong className="math-symbol">σ</strong>):
               <input
                 type="number"
+                id="stddev-input"
                 value={stdDev}
                 onChange={(e) => setStdDev(Number(e.target.value))}
                 min="0.1"
                 step="0.1"
+                className="styled-input"
               />
             </label>
           </div>
         )}
-        
-        {loading && <p>Cargando datos de la distribución...</p>}
-        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-        
-        <div style={{ width: '70%', margin: '20px auto' }}>
+
+        {loading && <p className="loading-message">Cargando datos de la distribución...</p>}
+        {error && <p className="error-message">Error: {error}</p>}
+
+        <div className="chart-container">
           {chartData.datasets && chartData.datasets[0] && chartData.datasets[0].data.length > 0 && (
             React.createElement(currentChartComponent, { data: chartData, options: chartOptions })
           )}
@@ -317,165 +330,153 @@ function App() {
       </section>
 
       {/* Sección 2: Análisis de Datos de Abandono Reales */}
-      <section style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px' }}>
+      <section className="card-section">
         <h2>Análisis de Datos de Abandono por Semestre (Datos Observados)</h2>
-        <p>Introduce la cantidad de estudiantes que abandonaron por cada semestre (del 1º al 10º).</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', maxWidth: '800px', margin: '0 auto' }}>
+        <p className="section-description">Introduce la cantidad de estudiantes que abandonaron por cada semestre (del 1º al 10º).</p>
+        <div className="observed-data-grid">
           {observedAbandonmentData.map((count, index) => (
-            <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <label>
+            <div key={index} className="observed-data-item">
+              <label htmlFor={`semestre-${index + 1}`}>
                 {index + 1}º Semestre:
                 <input
                   type="number"
+                  id={`semestre-${index + 1}`}
                   value={count}
                   onChange={(e) => handleObservedDataChange(index, e.target.value)}
                   min="0"
-                  style={{ width: '80px', textAlign: 'center' }}
+                  className="styled-input small-input"
                 />
               </label>
             </div>
           ))}
         </div>
-        
-        <div style={{ width: '70%', margin: '20px auto' }}>
+
+        <div className="chart-container">
           {observedChartData.datasets && observedChartData.datasets[0] && observedChartData.datasets[0].data.length > 0 && (
             <Bar data={observedChartData} options={observedChartOptions} />
           )}
         </div>
 
         {/* Sección de Pruebas de Bondad de Ajuste */}
-        <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-            <h3>Pruebas de Bondad de Ajuste</h3>
-            <p>Selecciona una prueba para determinar si tus datos de abandono se ajustan a la distribución teórica seleccionada en la sección superior.</p>
-            <div>
-                <label>
-                    Tipo de Prueba:
-                    <select value={testType} onChange={(e) => setTestType(e.target.value)}>
-                        <option value="chi_square">Chi-cuadrado ($\chi^2$)</option>
-                        <option value="kolmogorov_smirnov">Kolmogorov-Smirnov (K-S)</option>
-                    </select>
-                </label>
-                <button 
-                  onClick={runGoodnessOfFitTest} 
-                  disabled={testLoading}
-                  style={{ marginLeft: '15px', padding: '10px 20px', fontSize: '16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                >
-                  {testLoading ? 'Ejecutando...' : 'Ejecutar Prueba'}
-                </button>
-            </div>
+        <div className="sub-section">
+          <h3>Pruebas de Bondad de Ajuste</h3>
+          <p className="section-description">Selecciona una prueba para determinar si tus datos de abandono se ajustan a la distribución teórica seleccionada en la sección superior.</p>
+          <div className="input-group-row">
+            <label htmlFor="test-type-select">
+              Tipo de Prueba:
+              <select
+                id="test-type-select"
+                value={testType}
+                onChange={(e) => setTestType(e.target.value)}
+                className="styled-select"
+              >
+                <option value="chi_square">Chi-cuadrado (<strong className="math-symbol">χ²</strong>)</option>
+                <option value="kolmogorov_smirnov">Kolmogorov-Smirnov (K-S)</option>
+              </select>
+            </label>
+            <button
+              onClick={runGoodnessOfFitTest}
+              disabled={testLoading}
+              className="styled-button ml-15"
+            >
+              {testLoading ? 'Ejecutando...' : 'Ejecutar Prueba'}
+            </button>
+          </div>
 
-            {testLoading && <p style={{ marginTop: '15px' }}>Calculando la prueba...</p>}
-            {testError && <p style={{ color: 'red', marginTop: '15px' }}>Error en la prueba: {testError}</p>}
+          {testLoading && <p className="loading-message mt-15">Calculando la prueba...</p>}
+          {testError && <p className="error-message mt-15">Error en la prueba: {testError}</p>}
 
-            {testResults && !testLoading && !testError && (
-                <div style={{ marginTop: '20px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-                    <h4>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h4>
-                    {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
-                    <p><strong>Distribución Teórica Comparada:</strong> {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} ({testResults.distributionType === 'poisson' ? `λ=${lambda}` : `μ=${mean}, σ=${stdDev}`})</p>
-                    <p><strong>Estadístico de Prueba:</strong> {testResults.statistic}</p>
-                    <p><strong>P-valor:</strong> {testResults.pValue}</p>
-                    {testResults.details.degrees_of_freedom !== undefined && (
-                        <p><strong>Grados de Libertad:</strong> {testResults.details.degrees_of_freedom}</p>
-                    )}
-                    <p><strong>Conclusión:</strong> {testResults.conclusion}</p>
-                    {testResults.details.grouped_observed_counts && (
-                      <section className="test-results-container">
-          <h2>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h2>
-          <p>
-            **Distribución Teórica Comparada:**{' '}
-            {testResults.distributionType === 'poisson' && `Poisson (λ=${lambda})`}
-            {testResults.distributionType === 'normal' && `Normal (μ=${mean}, σ=${stdDev})`}
-          </p>
-          {testResults.statistic !== null && (
-            <p>
-              **Estadístico de Prueba:** {testResults.statistic}
-            </p>
-          )}
-          {testResults.pValue !== null && (
-            <p>
-              **P-valor:** {testResults.pValue}
-            </p>
-          )}
-
-          {/* ESTA ES LA SECCIÓN NUEVA/MODIFICADA PARA LA TABLA */}
-          {testResults.details && testResults.details.grouped_observed_counts && testResults.details.grouped_expected_counts && (
-            <div className="frequency-table-container">
-              <h3>Frecuencias Agrupadas para la Prueba Chi-cuadrado:</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Grupo/Categoría</th>
-                    <th>Frecuencias Observadas</th>
-                    <th>Frecuencias Esperadas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {testResults.details.grouped_observed_counts.map((obs, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td> {/* Si quieres, podrías hacer un rango aquí, pero para simplicidad, se usa el índice. */}
-                      <td>{obs.toFixed(2)}</td>
-                      <td>{testResults.details.grouped_expected_counts[index].toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {testResults.details.degrees_of_freedom !== undefined && (
-                <p className="small-text">
-                  Grados de Libertad (df): {testResults.details.degrees_of_freedom}
-                </p>
-              )}
-              <p className="small-text">
-                Nota: Las frecuencias esperadas menores a 5 se agrupan para la validez de la prueba Chi-cuadrado, siguiendo el criterio de Cochran.
+          {testResults && !testLoading && !testError && (
+            <div className="results-card">
+              <h4>Resultados de la Prueba ({testResults.testType === 'chi_square' ? 'Chi-cuadrado' : 'Kolmogorov-Smirnov'})</h4>
+              <p>
+                <strong className="bold-text">Distribución Teórica Comparada:</strong> {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)}{' '}
+                ({testResults.distributionType === 'poisson' ? (
+                  <>
+                    <strong className="math-symbol">λ</strong>={lambda}
+                  </>
+                ) : (
+                  <>
+                    <strong className="math-symbol">μ</strong>={mean},{' '}
+                    <strong className="math-symbol">σ</strong>={stdDev}
+                  </>
+                )})
               </p>
+              <p><strong className="bold-text">Estadístico de Prueba:</strong> {testResults.statistic.toFixed(4)}</p> {/* Formatear a 4 decimales */}
+              <p><strong className="bold-text">P-valor:</strong> {testResults.pValue.toFixed(4)}</p> {/* Formatear a 4 decimales */}
+              {testResults.details && testResults.details.degrees_of_freedom !== undefined && (
+                <p><strong className="bold-text">Grados de Libertad:</strong> {testResults.details.degrees_of_freedom}</p>
+              )}
+
+              {testResults.testType === 'chi_square' && testResults.details.grouped_observed_counts && testResults.details.grouped_expected_counts && (
+                <div className="frequency-table-container">
+                  <h3>Frecuencias Agrupadas para la Prueba Chi-cuadrado:</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Grupo/Categoría</th>
+                        <th>Frecuencias Observadas</th>
+                        <th>Frecuencias Esperadas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {testResults.details.grouped_observed_counts.map((obs, index) => (
+                        <tr key={index}>
+                          <td>{index + 1}</td>
+                          <td>{obs.toFixed(2)}</td>
+                          <td>{testResults.details.grouped_expected_counts[index].toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="small-text">
+                    Nota: Las frecuencias esperadas menores a 5 se agrupan para la validez de la prueba Chi-cuadrado, siguiendo el criterio de Cochran.
+                  </p>
+                </div>
+              )}
+              <p><strong className="bold-text">Conclusión:</strong> {testResults.conclusion}</p>
             </div>
           )}
-          {/* FIN DE LA SECCIÓN MODIFICADA */}
-
-          <p>
-            **Conclusión:** {testResults.conclusion}
-          </p>
-        </section>
-                    )}
-                </div>
-            )}
         </div>
 
         {/* Sección de Conclusiones y Recomendaciones */}
-        <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-            <h2>Conclusiones y Recomendaciones</h2>
-            {testResults ? (
-                <div>
-                    {testResults.conclusion.includes("NO se ajustan") ? (
-                        <>
-                            {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
-                            <p><strong>Los datos observados de abandono NO se ajustan a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto sugiere que la forma en que los estudiantes abandonan no sigue este patrón estadístico específico.</p>
-                            <h3>Posibles Razones y Recomendaciones:</h3>
-                            <ul>
-                                <li>**Exploración de otros factores:** Investiga otros factores que podrían influir en el abandono, como el rendimiento académico, situación socioeconómica, apoyo psicológico, calidad de la enseñanza, o eventos externos (pandemias, crisis económicas).</li>
-                                <li>**Prueba con diferentes distribuciones:** Intenta ajustar los datos a otras distribuciones de probabilidad (ej. Binomial Negativa si hay "sobre-dispersión" en los conteos, o una Normal con diferentes parámetros) para ver si alguna se ajusta mejor.</li>
-                                <li>**Análisis de Segmentos:** Divide a los estudiantes por cohortes (ej. por año de ingreso, por programa de estudio) y analiza el abandono para cada segmento. Los patrones podrían variar.</li>
-                                <li>**Modelos Predictivos:** Considera el uso de modelos de Machine Learning (ej. regresión logística, árboles de decisión) que puedan identificar a los estudiantes en riesgo de abandono basándose en múltiples variables.</li>
-                                <li>**Recopilación de Datos Adicionales:** Si es posible, recolecta datos más detallados sobre las razones del abandono directamente de los estudiantes (encuestas de salida, entrevistas).</li>
-                            </ul>
-                        </>
-                    ) : (
-                        <>
-                            {/* CORRECCIÓN AQUÍ: Capitalizar correctamente en JS */}
-                            <p><strong>Los datos observados de abandono PUEDEN ajustarse a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto implica que el patrón de abandono podría estar influenciado por un proceso aleatorio consistente con esta distribución. Por ejemplo, en Poisson, esto podría indicar que la tasa promedio de abandono ($\lambda$) es relativamente constante por semestre.</p>
-                            <h3>Posibles Acciones y Recomendaciones:</h3>
-                            <ul>
-                                <li>**Validación del Modelo:** Aunque la prueba no rechazó la hipótesis nula, esto no prueba que los datos *definitivamente* sigan esa distribución. Es una buena indicación, pero siempre es útil validar con más datos o con otros métodos.</li>
-                                <li>**Comprensión de los Parámetros:** Si se ajusta a Poisson, el $\lambda$ (media de eventos por semestre) es un indicador clave. Si se ajusta a Normal, la media y desviación estándar describen el pico y la dispersión del abandono. Usa estos parámetros para entender mejor el fenómeno.</li>
-                                <li>**Identificación de Semestres Críticos:** Observa dónde se concentra la mayor probabilidad de abandono según la distribución teórica. Por ejemplo, con $\lambda=2$ en Poisson, los semestres 1 y 2 son críticos.</li>
-                                <li>**Intervenciones Dirigidas:** Diseña programas de apoyo dirigidos a los semestres o períodos donde la distribución predice un mayor abandono. Esto podría incluir tutorías, apoyo financiero, asesoramiento académico o psicológico.</li>
-                                <li>**Monitoreo Continuo:** Sigue monitoreando los datos de abandono para ver si el patrón se mantiene con el tiempo y si las intervenciones tienen un impacto.</li>
-                            </ul>
-                        </>
-                    )}
-                </div>
-            ) : (
-                <p>Ejecuta una prueba de bondad de ajuste para ver conclusiones y recomendaciones.</p>
-            )}
+        <div className="sub-section">
+          <h2>Conclusiones y Recomendaciones</h2>
+          {testResults ? (
+            <div>
+              {testResults.conclusion.includes("NO se ajustan") ? (
+                <>
+                  <p className="conclusion-text">
+                    <strong className="bold-text">Los datos observados de abandono NO se ajustan a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto sugiere que la forma en que los estudiantes abandonan no sigue este patrón estadístico específico.
+                  </p>
+                  <h3>Posibles Razones y Recomendaciones:</h3>
+                  <ul className="recommendations-list">
+                    <li><strong className="bold-text">Exploración de otros factores:</strong> Investiga otros factores que podrían influir en el abandono, como el rendimiento académico, situación socioeconómica, apoyo psicológico, calidad de la enseñanza, o eventos externos (pandemias, crisis económicas).</li>
+                    <li><strong className="bold-text">Prueba con diferentes distribuciones:</strong> Intenta ajustar los datos a otras distribuciones de probabilidad (ej. Binomial Negativa si hay "sobre-dispersión" en los conteos, o una Normal con diferentes parámetros) para ver si alguna se ajusta mejor.</li>
+                    <li><strong className="bold-text">Análisis de Segmentos:</strong> Divide a los estudiantes por cohortes (ej. por año de ingreso, por programa de estudio) y analiza el abandono para cada segmento. Los patrones podrían variar.</li>
+                    <li><strong className="bold-text">Modelos Predictivos:</strong> Considera el uso de modelos de Machine Learning (ej. regresión logística, árboles de decisión) que puedan identificar a los estudiantes en riesgo de abandono basándose en múltiples variables.</li>
+                    <li><strong className="bold-text">Recopilación de Datos Adicionales:</strong> Si es posible, recolecta datos más detallados sobre las razones del abandono directamente de los estudiantes (encuestas de salida, entrevistas).</li>
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p className="conclusion-text">
+                    <strong className="bold-text">Los datos observados de abandono PUEDEN ajustarse a la distribución {testResults.distributionType.charAt(0).toUpperCase() + testResults.distributionType.slice(1)} con los parámetros seleccionados.</strong> Esto implica que el patrón de abandono podría estar influenciado por un proceso aleatorio consistente con esta distribución. Por ejemplo, en Poisson, esto podría indicar que la tasa promedio de abandono (<strong className="math-symbol">λ</strong>) es relativamente constante por semestre.
+                  </p>
+                  <h3>Posibles Acciones y Recomendaciones:</h3>
+                  <ul className="recommendations-list">
+                    <li><strong className="bold-text">Validación del Modelo:</strong> Aunque la prueba no rechazó la hipótesis nula, esto no prueba que los datos *definitivamente* sigan esa distribución. Es una buena indicación, pero siempre es útil validar con más datos o con otros métodos.</li>
+                    <li><strong className="bold-text">Comprensión de los Parámetros:</strong> Si se ajusta a Poisson, el <strong className="math-symbol">λ</strong> (media de eventos por semestre) es un indicador clave. Si se ajusta a Normal, la media y desviación estándar (<strong className="math-symbol">μ</strong> y <strong className="math-symbol">σ</strong>) describen el pico y la dispersión del abandono. Usa estos parámetros para entender mejor el fenómeno.</li>
+                    <li><strong className="bold-text">Identificación de Semestres Críticos:</strong> Observa dónde se concentra la mayor probabilidad de abandono según la distribución teórica. Por ejemplo, con <strong className="math-symbol">λ</strong>=2 en Poisson, los semestres 1 y 2 son críticos.</li>
+                    <li><strong className="bold-text">Intervenciones Dirigidas:</strong> Diseña programas de apoyo dirigidos a los semestres o períodos donde la distribución predice un mayor abandono. Esto podría incluir tutorías, apoyo financiero, asesoramiento académico o psicológico.</li>
+                    <li><strong className="bold-text">Monitoreo Continuo:</strong> Sigue monitoreando los datos de abandono para ver si el patrón se mantiene con el tiempo y si las intervenciones tienen un impacto.</li>
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="section-description">Ejecuta una prueba de bondad de ajuste para ver conclusiones y recomendaciones.</p>
+          )}
         </div>
       </section>
     </div>
