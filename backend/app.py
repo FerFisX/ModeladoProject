@@ -93,9 +93,8 @@ def run_goodness_of_fit_test():
     observed_counts_np = np.array(observed_data)
     
     # --- Generación de frecuencias esperadas y agrupación para Chi-cuadrado ---
-    # Esto se hará siempre, ya que es la base para ambas pruebas o para los detalles
     
-    expected_pmfs = [] # Probabilidad puntual teórica para cada semestre
+    expected_probabilities_for_bins = [] # Probabilidad teórica para cada "bin" (semestre)
     
     if distribution_type == 'poisson':
         if lambda_val is None:
@@ -103,47 +102,16 @@ def run_goodness_of_fit_test():
             return jsonify(results)
         lambda_val = float(lambda_val)
         
-        # Calcular PMF para k=1, 2, ..., 10 (que son los semestres)
-        # Note: poisson.pmf(0, lambda_val) es P(X=0). Si nuestros semestres son 1-10, no incluimos k=0.
-        # Si la prueba K-S va a generar una muestra, esta muestra tendrá valores 1 a 10.
-        for k_semestre in range(1, len(observed_data) + 1): # Semestres 1 a 10
-            expected_pmfs.append(poisson.pmf(k_semestre, lambda_val))
+        # Asumimos que los "semestres" 1 a 10 corresponden a los conteos k=1 a k=10
+        # El último bin (semestre 10) debe incluir la probabilidad de X >= 10
         
-        # Ajustar la suma de PMFs para el caso discreto si es necesario para que sumen 1
-        # La suma de PMFs de Poisson hasta cierto punto no suma 1.0.
-        # Para Chi-cuadrado, necesitamos frecuencias esperadas que sumen total_observed_count.
-        # La cola de la distribución de Poisson puede extenderse mucho.
-        # Es mejor usar poisson.cdf para calcular la probabilidad de "bins" discretos.
+        for k_val in range(1, len(observed_data)): # Bins para k=1 a k=9
+            expected_probabilities_for_bins.append(poisson.pmf(k_val, lambda_val))
         
-        # Recalculemos las PMFs, incluyendo P(X=0) y asegurando que las sumas finales
-        # de los bins esperados cubran 100% de la probabilidad para Chi-cuadrado
+        # Último bin: P(X >= len(observed_data)) (ej. P(X >= 10) para el 10mo semestre)
+        # 1 - poisson.cdf(k-1, lambda) es P(X >= k)
+        expected_probabilities_for_bins.append(1 - poisson.cdf(len(observed_data) - 1, lambda_val))
         
-        # Probabilidades para k=0, 1, ..., 9 (equivalente a los semestres 1-10 en tus datos)
-        # Asumimos que tus datos de semestre 1 corresponden a k=0 en Poisson, etc.
-        # Esto es clave: "semestre 1" (observado) se compara con "0 eventos" (Poisson)
-        # O "semestre 1" es "1 evento", "semestre 2" es "2 eventos", etc.
-        # La última interpretación es más común para "conteo de eventos por semestre".
-        # Si es "conteo de abandonos en el semestre X", entonces Semestre 1 = k=1
-        # Vamos a seguir la interpretación de "Semestre N" significa "N eventos".
-        
-        # Expected PMFs para k=1 a k=10
-        raw_expected_pmfs = [poisson.pmf(k_val, lambda_val) for k_val in range(1, len(observed_data) + 1)]
-        
-        # Para chi-cuadrado, es mejor calcular las probabilidades de los bins que están en tus datos
-        # Y la probabilidad de la 'cola' si es que el último bin observado es un 'y más'.
-        
-        # Este es un punto de ambigüedad. Si "semestre 1" significa 1 evento en Poisson,
-        # entonces el rango de k para Poisson debe ser 1 a 10.
-        # Si los semestres 1-10 son simplemente categorías, y la distribución de Poisson
-        # modela la "posición del abandono", entonces k puede empezar en 0.
-        # Asumamos que Semestre N corresponde a k=N en la distribución de Poisson.
-        
-        # Probabilidades de P(X=1), P(X=2), ..., P(X=9), y P(X >= 10) para el último bin.
-        poisson_probs_bins = [poisson.pmf(k, lambda_val) for k in range(1, len(observed_data))] # P(X=1) to P(X=9)
-        poisson_probs_bins.append(1 - poisson.cdf(len(observed_data) - 1, lambda_val)) # P(X >= 10)
-        
-        expected_counts = np.array(poisson_probs_bins) * total_observed_count
-
     elif distribution_type == 'normal':
         if mean_val is None or std_dev_val is None:
             results["conclusion"] = "Media o Desviación Estándar para Normal no proporcionados."
@@ -152,96 +120,138 @@ def run_goodness_of_fit_test():
         std_dev_val = float(std_dev_val)
 
         # Calculamos la probabilidad de cada bin (semestre) bajo la curva Normal
-        expected_probs_normal = []
+        # Asumimos que los semestres son rangos (ej. semestre 1 = 0.5 a 1.5, semestre 2 = 1.5 a 2.5, etc.)
+        # Y el último bin es 9.5 a infinito
         
-        # Probabilidad de P(X <= 0.5) para manejar el inicio antes del semestre 1
-        prob_up_to_0_5 = norm.cdf(0.5, loc=mean_val, scale=std_dev_val)
+        # Probabilidad acumulada hasta el límite inferior del primer semestre
+        # P(X < 0.5) o P(X <= 0) si consideramos el primer semestre como el inicio.
+        # Para ser consistentes con la discretización de semestres
+        prev_cdf = norm.cdf(0.5, loc=mean_val, scale=std_dev_val) # P(X <= 0.5)
         
-        prev_cdf = prob_up_to_0_5
         for i in range(1, len(observed_data)): # Semestres 1 a 9
-            current_upper_bound = i + 0.5
+            current_upper_bound = i + 0.5 # Límite superior del bin (ej. para sem 1 es 1.5)
             current_cdf = norm.cdf(current_upper_bound, loc=mean_val, scale=std_dev_val)
-            expected_probs_normal.append(current_cdf - prev_cdf)
+            expected_probabilities_for_bins.append(current_cdf - prev_cdf)
             prev_cdf = current_cdf
         
         # Última categoría (10mo semestre y más allá)
-        expected_probs_normal.append(1 - prev_cdf) # P(X > 9.5)
+        expected_probabilities_for_bins.append(1 - prev_cdf) # P(X > 9.5)
         
-        # Asegurarse de que la suma de expected_probs_normal sea 1 (o muy cerca)
-        sum_expected_probs = sum(expected_probs_normal)
-        if sum_expected_probs > 0: # Normalizar si no suma 1 (debido a errores de flotante)
-             expected_probs_normal = np.array(expected_probs_normal) / sum_expected_probs
-        else:
-             results["conclusion"] = "Suma de probabilidades esperadas es cero. Parámetros Normales podrían ser inadecuados."
-             return jsonify(results)
-
-        expected_counts = expected_probs_normal * total_observed_count
-
     else:
         results["conclusion"] = "Tipo de distribución no soportado para la prueba."
         return jsonify(results)
 
-    # --- Agrupación de categorías para Chi-cuadrado y K-S (si se genera muestra) ---
+    # --- NORMALIZACIÓN CRUCIAL PARA CHI-CUADRADO ---
+    # Asegurarse de que la suma de las probabilidades esperadas sea 1.0 (o muy cercana)
+    # y luego escalarlas al total de observaciones.
+    sum_expected_probs = np.sum(expected_probabilities_for_bins)
+    if sum_expected_probs <= 0: # Si la suma es cero o negativa, hay un problema con los parámetros.
+        results["conclusion"] = "Suma de probabilidades esperadas es cero o negativa. Parámetros de distribución podrían ser inadecuados."
+        return jsonify(results)
+
+    # Normalizar las probabilidades para que sumen 1, y luego escalar por el total de observados.
+    normalized_expected_probs = np.array(expected_probabilities_for_bins) / sum_expected_probs
+    expected_counts_raw = normalized_expected_probs * total_observed_count
+    
+    # --- Agrupación de categorías para Chi-cuadrado ---
     # Esta función agrupará los datos para asegurar que las frecuencias esperadas >= 5
-    def group_categories(obs_counts, exp_counts):
+    # (o un mínimo configurable, 5 es el estándar de Cochran)
+    def group_categories(obs_counts, exp_counts, min_expected=5):
         grouped_obs = []
         grouped_exp = []
         current_obs_group = 0
         current_exp_group = 0
+        
+        # Asegurarse de que exp_counts no contenga NaNs o Infs antes de agrupar
+        exp_counts = np.nan_to_num(exp_counts, nan=0.0, posinf=0.0, neginf=0.0)
 
         for i in range(len(obs_counts)):
-            # Si la frecuencia esperada actual es menor a 5, agrupar
-            if exp_counts[i] < 5:
-                current_obs_group += obs_counts[i]
-                current_exp_group += exp_counts[i]
-                
-                # Si es la última categoría O el grupo acumulado ya es >= 5, entonces cerrar el grupo
-                if i == len(obs_counts) - 1 or current_exp_group >= 5:
-                    grouped_obs.append(current_obs_group)
-                    grouped_exp.append(current_exp_group)
-                    current_obs_group = 0
-                    current_exp_group = 0
-            else:
-                # Si hay un grupo acumulado y la categoría actual es grande, cerrar el grupo acumulado
-                if current_exp_group > 0:
-                    grouped_obs.append(current_obs_group)
-                    grouped_exp.append(current_exp_group)
-                    current_obs_group = 0
-                    current_exp_group = 0
-                # Añadir la categoría actual directamente
-                grouped_obs.append(obs_counts[i])
-                grouped_exp.append(exp_counts[i])
-        
-        # Asegurarse de que el último grupo acumulado se añada si existe
-        if current_exp_group > 0:
-            grouped_obs.append(current_obs_group)
-            grouped_exp.append(current_exp_group)
+            current_obs_group += obs_counts[i]
+            current_exp_group += exp_counts[i]
             
+            # Si es la última categoría O el grupo acumulado ya es >= min_expected
+            # y no estamos en la última categoría (para no crear un grupo solo con la última)
+            # O estamos en la última categoría y necesitamos cerrar el grupo
+            if (current_exp_group >= min_expected and i < len(obs_counts) - 1) or \
+               (i == len(obs_counts) - 1):
+                
+                # Si el último grupo acumulado aún es < min_expected, intentamos fusionarlo con el anterior
+                # Esto es una lógica más compleja para evitar grupos muy pequeños al final.
+                # Simplificaremos: si al final un grupo es pequeño, lo combinamos con el penúltimo.
+                
+                # Añadir el grupo actual si es válido
+                if current_exp_group > 0: # Solo añadir si hay algo en el grupo
+                    grouped_obs.append(current_obs_group)
+                    grouped_exp.append(current_exp_group)
+                current_obs_group = 0
+                current_exp_group = 0
+            
+            # Caso especial: Si es la última categoría y el current_exp_group es menor que min_expected
+            # y ya hay grupos, intenta fusionar con el último grupo existente.
+            # Esto puede llevar a un bucle infinito si hay solo un grupo y es menor que min_expected.
+            # Una estrategia más simple y robusta es agrupar solo hacia adelante o hacia atrás.
+            # La implementación actual agrupa hacia adelante.
+
+        # Post-processing para asegurar que los últimos grupos cumplan min_expected
+        # Si el último grupo es menor que min_expected, se fusiona con el penúltimo.
+        # Esto podría ser un problema si solo hay un grupo pequeño.
+        # En ese caso, la prueba Chi-cuadrado no es apropiada.
+        if len(grouped_exp) > 1 and grouped_exp[-1] < min_expected:
+            grouped_exp[-2] += grouped_exp[-1]
+            grouped_obs[-2] += grouped_obs[-1]
+            grouped_exp.pop()
+            grouped_obs.pop()
+        elif len(grouped_exp) == 1 and grouped_exp[0] < min_expected:
+            # Si solo hay un grupo y es muy pequeño, la prueba Chi-cuadrado no es fiable.
+            # Podríamos optar por no realizar la prueba o avisar.
+            # Para este caso, dejaremos que chisquare falle si no hay suficientes datos,
+            # pero el frontend recibirá el error.
+            pass # No hacer nada, dejar que el flujo continúe
+
         return np.array(grouped_obs), np.array(grouped_exp)
 
+
     # Aplicar la agrupación
-    grouped_observed_np, grouped_expected_np = group_categories(observed_counts_np, expected_counts)
+    # Aquí es donde `expected_counts_raw` (ya escalado al total de observados) se usa.
+    grouped_observed_np, grouped_expected_np = group_categories(observed_counts_np, expected_counts_raw)
     
-    # Asegurar que no haya ceros en las frecuencias esperadas después de agrupar para evitar NaNs
-    # Reemplazar 0s con un valor muy pequeño (ej. 1e-10) si persiste, aunque la agrupación debería evitarlo
-    # Si sum(grouped_expected_np) es 0 o muy cercano a 0, eso es un problema de parámetros.
-    if np.sum(grouped_expected_np) == 0:
-        results["conclusion"] = "Las frecuencias esperadas agrupadas son cero. Parámetros de distribución podrían ser extremos."
+    # Verificar que no haya bins vacíos o con valores esperados muy bajos después de la agrupación
+    # También asegurarse de que las sumas sigan siendo consistentes después de la agrupación.
+    # SciPy chisquare tiene sus propias validaciones para sumas, pero es bueno ser proactivo.
+    
+    # Si después de agrupar, la suma de esperados difiere mucho de la suma de observados,
+    # algo salió mal en la agrupación o en los datos originales.
+    if not np.isclose(np.sum(grouped_observed_np), np.sum(grouped_expected_np)):
+        results["conclusion"] = f"Error interno: La suma de frecuencias observadas ({np.sum(grouped_observed_np)}) no coincide con la suma de esperadas ({np.sum(grouped_expected_np)}) después de la agrupación. Diferencia porcentual: {abs(np.sum(grouped_observed_np) - np.sum(grouped_expected_np)) / np.sum(grouped_observed_np) * 100:.2f}%"
         return jsonify(results)
+
+    # Asegurar que no haya ceros en las frecuencias esperadas después de agrupar para evitar NaNs
+    # Esto ya lo hace group_categories con nan_to_num, pero es una doble verificación.
+    if np.any(grouped_expected_np <= 0):
+        # Reemplazar 0s con un valor muy pequeño (ej. 1e-10) para evitar división por cero en chisquare si esto ocurre
+        # Esto es un workaround, la agrupación debería evitarlo idealmente.
+        grouped_expected_np = np.maximum(grouped_expected_np, 1e-10)
+
 
     # --- Ejecutar la Prueba Seleccionada ---
     if test_type == 'chi_square':
         try:
             # chisquare directamente compara observados y esperados
-            # Asegúrate de que las sumas sean iguales o casi iguales, scipy puede normalizar.
+            # Si el error "sum of observed must agree with sum of expected" persiste,
+            # forzar la normalización de chisquare (correct=False) puede ayudar, pero no es la solución ideal.
+            # La solución ideal es que tus datos estén correctos antes.
             stat, p_value = chisquare(f_obs=grouped_observed_np, f_exp=grouped_expected_np)
+            
+            # Los grados de libertad son (número de bins agrupados - 1)
+            # Si se estimó un parámetro de la distribución (lambda, media, std_dev) a partir de los datos,
+            # se resta un grado de libertad adicional por cada parámetro estimado.
+            # Aquí, los parámetros son dados por el usuario, no estimados de 'observed_data',
+            # por lo que no se restan grados de libertad adicionales por los parámetros.
             df = len(grouped_observed_np) - 1 
-            # Si se estimara un parámetro de la distribución (ej. lambda de los datos), se restaría 1 grado de libertad adicional.
-            # Aquí, lambda es un parámetro dado por el usuario, por lo que no se resta.
             
             # Asegurar que el estadístico y p-valor no sean NaN si hay problemas con los datos
             if np.isnan(stat) or np.isnan(p_value):
-                 results["conclusion"] = "Error de cálculo: Estadístico o P-valor Chi-cuadrado resultó en NaN."
+                 results["conclusion"] = "Error de cálculo: Estadístico o P-valor Chi-cuadrado resultó en NaN. Datos inadecuados para la prueba."
                  return jsonify(results)
 
             results["statistic"] = round(stat, 4)
@@ -256,45 +266,34 @@ def run_goodness_of_fit_test():
             else:
                 results["conclusion"] = f"No se rechaza la hipótesis nula (H0). Los datos observados PUEDEN ajustarse a una distribución {distribution_type.capitalize()} con los parámetros dados (p-valor = {p_value:.4f} >= {alpha})."
         except Exception as e:
+            import traceback
             results["conclusion"] = f"Error al ejecutar la prueba Chi-cuadrado: {str(e)}"
             results["details"]["error_message"] = str(e)
+            results["details"]["traceback"] = traceback.format_exc() # Para depuración
 
 
     elif test_type == 'kolmogorov_smirnov':
         try:
             # Generar muestra_sintetica para K-S
-            # Este es el punto crucial que podría causar problemas si la muestra se hace gigante
-            # o si los valores de k para poisson/norm cdf no son adecuados.
-            
-            # synthetic_sample debe ser una lista de valores individuales (no frecuencias)
             synthetic_sample = []
-            # 'i+1' para mapear el índice del array (0-9) a los semestres (1-10)
             for i, count in enumerate(observed_data): 
-                if count > 0: # Evitar agregar ceros si no hay abandonos
-                    # Agrega el número de semestre 'count' veces
-                    # Por ejemplo, si semestre 1 tiene 345 abandonos, agrega 1 (345 veces)
+                if count > 0: 
                     synthetic_sample.extend([i + 1] * count) 
             
-            if not synthetic_sample: # Si la muestra sintética está vacía (todos los abandonos son 0)
+            if not synthetic_sample: 
                 results["conclusion"] = "No hay datos en la muestra observada para la prueba K-S."
                 return jsonify(results)
 
-            # Convertir a numpy array para kstest
             synthetic_sample_np = np.array(synthetic_sample)
 
             if distribution_type == 'poisson':
-                # Para K-S de Poisson, se necesita una función que calcule la CDF de Poisson para los valores de la muestra.
-                # kstest(sample, cdf_function, args)
                 stat, p_value = kstest(synthetic_sample_np, lambda x: poisson.cdf(x, lambda_val))
             elif distribution_type == 'normal':
-                # Para K-S de Normal, se usa el nombre de la distribución 'norm' y sus args
                 stat, p_value = kstest(synthetic_sample_np, 'norm', args=(mean_val, std_dev_val))
             
-            # Asegurar que el estadístico y p-valor no sean NaN si hay problemas con los datos
             if np.isnan(stat) or np.isnan(p_value):
-                 results["conclusion"] = "Error de cálculo: Estadístico o P-valor K-S resultó en NaN."
+                 results["conclusion"] = "Error de cálculo: Estadístico o P-valor K-S resultó en NaN. Datos inadecuados para la prueba."
                  return jsonify(results)
-
 
             results["statistic"] = round(stat, 4)
             results["pValue"] = round(p_value, 4)
@@ -306,10 +305,10 @@ def run_goodness_of_fit_test():
             else:
                 results["conclusion"] = f"No se rechaza la hipótesis nula (H0). Los datos observados PUEDEN ajustarse a una distribución {distribution_type.capitalize()} con los parámetros dados (p-valor = {p_value:.4f} >= {alpha})."
         except Exception as e:
+            import traceback
             results["conclusion"] = f"Error al ejecutar la prueba Kolmogorov-Smirnov: {str(e)}"
             results["details"]["error_message"] = str(e)
-            import traceback
-            results["details"]["traceback"] = traceback.format_exc() # Para depuración
+            results["details"]["traceback"] = traceback.format_exc() 
         
     else:
         results["conclusion"] = "Tipo de prueba no soportado o error en parámetros."
