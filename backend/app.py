@@ -1,11 +1,13 @@
 from flask import Flask, jsonify, request, send_from_directory
 import os
+from flask_cors import CORS
 import math
 from scipy.stats import norm, poisson, kstest, chisquare
-import numpy as np # Importar numpy para operaciones con arrays
+import numpy as np 
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
-
+CORS(app) # Permitir CORS para todas las rutas
+# Configurar la carpeta estática para servir archivos de React
 # Ruta para servir los archivos estáticos de React (después de la construcción)
 @app.route('/')
 def serve_react_app():
@@ -318,4 +320,5 @@ def run_goodness_of_fit_test():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000)) 
+    app.run(host='0.0.0.0', port=port)
